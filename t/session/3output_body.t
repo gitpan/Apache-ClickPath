@@ -5,7 +5,7 @@ use Test::More;
 use Apache::TestUtil;
 use Apache::TestRequest 'GET_BODY';
 
-plan tests => 40;
+plan tests => 44;
 
 Apache::TestRequest::module('default');
 
@@ -30,6 +30,8 @@ open F, ">t/htdocs/tmp/x.html" and print F <<"EOF";
   <body>
     <a href="/index1.html">1</a>
     <a href="http://$hostport/index1.html">2</a>
+    <a href="javascript:window.close();">javascript</a>
+    <a href="mailto:bla">mailto</a>
     <a href="../index1.html">3</a>
     <a href="http://x.y/index1.html">4</a>
     <area href="/index1.html">1</area>
@@ -75,6 +77,10 @@ ok( t_cmp( $got, qr!<a href="/-S:\S+/tmp/\.\./index1\.html">3</a>! ),
     "a 3" );
 ok( t_cmp( $got, qr!<a href="http://x\.y/index1\.html">4</a>! ),
     "a 4" );
+ok( t_cmp( $got, qr!<a href="javascript:window\.close\(\);">javascript</a>! ),
+    "javascript" );
+ok( t_cmp( $got, qr!<a href="mailto:bla">mailto</a>! ),
+    "mailto" );
 
 ok( t_cmp( $got, qr!<area href="/-S:\S+/index1\.html">1</area>! ),
     "area 1" );
@@ -120,6 +126,10 @@ ok( t_cmp( $got, qr!<a href="\.\./index1\.html">3</a>! ),
     "a 3" );
 ok( t_cmp( $got, qr!<a href="http://x\.y/index1\.html">4</a>! ),
     "a 4" );
+ok( t_cmp( $got, qr!<a href="javascript:window\.close\(\);">javascript</a>! ),
+    "javascript" );
+ok( t_cmp( $got, qr!<a href="mailto:bla">mailto</a>! ),
+    "mailto" );
 
 ok( t_cmp( $got, qr!<form action="\Q$session\E/index1\.html">1</form>! ),
     "form 1" );

@@ -18,3 +18,8 @@ Revision history for Perl extension Apache::ClickPath.
 	* Torsten Foertsch <torsten.foertsch@gmx.net>
 	- Bugfix: the handler crashed without a <ClickPathUAExceptions>
 	  section
+
+1.1b  Thu Jan 27 14:16:36 CET 2005
+	* Torsten Foertsch <torsten.foertsch@gmx.net>
+	- Bugfix: mailto:, javascript: links are not considered to be
+	  relative links anymore

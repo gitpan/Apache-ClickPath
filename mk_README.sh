@@ -1,6 +1,6 @@
 #!/bin/bash
 
-(perldoc -tU ./lib/Apache::ClickPath.pm
+(perldoc -tU ./lib/Apache/ClickPath.pm
  perldoc -tU $0
 ) >README
 
