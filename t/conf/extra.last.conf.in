@@ -25,3 +25,132 @@ Options Indexes Includes ExecCGI
 SetHandler cgi-script
 </Directory>
 LogFormat "%h %l %u %t \"%m %U%q %H\" %>s %b \"%{Referer}i\" \"%{User-agent}i\" \"%{SESSION}e\""
+
+<VirtualHost Machine>
+<ClickPathUAExceptions>
+Google     Googlebot
+MSN        msnbot
+Mirago     HeinrichderMiragoRobot blub
+Yahoo      Yahoo-MMCrawler
+Seekbot    Seekbot
+Picsearch  psbot
+Globalspec Ocelli
+Naver      NaverBot
+Turnitin   TurnitinBot
+dir.com    Pompos
+search.ch  search\.ch
+IBM        http://www\.almaden\.ibm\.com/cs/crawler/
+</ClickPathUAExceptions>
+PerlTransHandler Apache::ClickPath
+ClickPathSessionPrefix "-S:"
+ClickPathMaxSessionAge 5
+PerlOutputFilterHandler Apache::ClickPath::OutputFilter
+<Directory "@ServerRoot@">
+Options Indexes Includes
+</Directory>
+<Directory "@DocumentRoot@/bin">
+Options Indexes Includes ExecCGI
+SetHandler cgi-script
+</Directory>
+LogFormat "%h %l %u %t \"%m %U%q %H\" %>s %b \"%{Referer}i\" \"%{User-agent}i\" \"%{SESSION}e\""
+
+ClickPathMachine test
+</VirtualHost>
+
+<VirtualHost NullMachine>
+<ClickPathUAExceptions>
+Google     Googlebot
+MSN        msnbot
+Mirago     HeinrichderMiragoRobot blub
+Yahoo      Yahoo-MMCrawler
+Seekbot    Seekbot
+Picsearch  psbot
+Globalspec Ocelli
+Naver      NaverBot
+Turnitin   TurnitinBot
+dir.com    Pompos
+search.ch  search\.ch
+IBM        http://www\.almaden\.ibm\.com/cs/crawler/
+</ClickPathUAExceptions>
+PerlTransHandler Apache::ClickPath
+ClickPathSessionPrefix "-S:"
+ClickPathMaxSessionAge 5
+PerlOutputFilterHandler Apache::ClickPath::OutputFilter
+<Directory "@ServerRoot@">
+Options Indexes Includes
+</Directory>
+<Directory "@DocumentRoot@/bin">
+Options Indexes Includes ExecCGI
+SetHandler cgi-script
+</Directory>
+LogFormat "%h %l %u %t \"%m %U%q %H\" %>s %b \"%{Referer}i\" \"%{User-agent}i\" \"%{SESSION}e\""
+
+ClickPathMachine
+</VirtualHost>
+
+<VirtualHost UAExceptionsFile>
+<ClickPathUAExceptions>
+Google     Googlebot
+MSN        msnbot
+Mirago     HeinrichderMiragoRobot blub
+Yahoo      Yahoo-MMCrawler
+Seekbot    Seekbot
+Picsearch  psbot
+Globalspec Ocelli
+Naver      NaverBot
+Turnitin   TurnitinBot
+dir.com    Pompos
+search.ch  search\.ch
+IBM        http://www\.almaden\.ibm\.com/cs/crawler/
+</ClickPathUAExceptions>
+PerlTransHandler Apache::ClickPath
+ClickPathSessionPrefix "-S:"
+ClickPathMaxSessionAge 5
+PerlOutputFilterHandler Apache::ClickPath::OutputFilter
+<Directory "@ServerRoot@">
+Options Indexes Includes
+</Directory>
+<Directory "@DocumentRoot@/bin">
+Options Indexes Includes ExecCGI
+SetHandler cgi-script
+</Directory>
+LogFormat "%h %l %u %t \"%m %U%q %H\" %>s %b \"%{Referer}i\" \"%{User-agent}i\" \"%{SESSION}e\""
+
+ClickPathUAExceptionsFile "@ServerRoot@/UAExceptions"
+</VirtualHost>
+
+<VirtualHost FriendlySession>
+<ClickPathUAExceptions>
+Google     Googlebot
+MSN        msnbot
+Mirago     HeinrichderMiragoRobot blub
+Yahoo      Yahoo-MMCrawler
+Seekbot    Seekbot
+Picsearch  psbot
+Globalspec Ocelli
+Naver      NaverBot
+Turnitin   TurnitinBot
+dir.com    Pompos
+search.ch  search\.ch
+IBM        http://www\.almaden\.ibm\.com/cs/crawler/
+</ClickPathUAExceptions>
+PerlTransHandler Apache::ClickPath
+ClickPathSessionPrefix "-S:"
+ClickPathMaxSessionAge 2
+PerlOutputFilterHandler Apache::ClickPath::OutputFilter
+<Directory "@ServerRoot@">
+Options Indexes Includes
+</Directory>
+<Directory "@DocumentRoot@/bin">
+Options Indexes Includes ExecCGI
+SetHandler cgi-script
+</Directory>
+LogFormat "%h %l %u %t \"%m %U%q %H\" %>s %b \"%{Referer}i\" \"%{User-agent}i\" \"%{SESSION}e\""
+
+<ClickPathFriendlySessions>
+  param.friendly.org   param(ld) param ( id )   f
+  uri.friendly.org     uri(1) uri ( 3 )         u
+ mixed.friendly.org    param(ld) uri ( 3 )      m
+</ClickPathFriendlySessions>
+ClickPathFriendlySessionsFile "@ServerRoot@/FriendlySessions"
+</VirtualHost>

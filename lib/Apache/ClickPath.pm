@@ -22,7 +22,7 @@ use Apache::Const -compile => qw(DECLINED OK
 use Time::HiRes ();
 use MIME::Base64 ();
 
-our $VERSION = '1.0';
+our $VERSION = '1.1';
 our $rcounter=int rand 0x10000;
 
 my @directives=
@@ -42,6 +42,13 @@ my @directives=
     errmsg       => 'ClickPathMaxSessionAge time_in_seconds',
    },
    {
+    name         => 'ClickPathUAExceptionsFile',
+    func         => __PACKAGE__ . '::ClickPathUAExceptionsFile',
+    req_override => Apache::RSRC_CONF,
+    args_how     => Apache::TAKE1,
+    errmsg       => 'ClickPathUAExceptionsFile filename',
+   },
+   {
     name         => '<ClickPathUAExceptions',
     func         => __PACKAGE__ . '::ClickPathUAExceptions',
     req_override => Apache::RSRC_CONF,
@@ -59,30 +66,74 @@ name2 regexp2
     args_how     => Apache::NO_ARGS,
     errmsg       => '</ClickPathUAExceptions> without <ClickPathUAExceptions>',
    },
+   {
+    name         => 'ClickPathFriendlySessionsFile',
+    func         => __PACKAGE__ . '::ClickPathFriendlySessionsFile',
+    req_override => Apache::RSRC_CONF,
+    args_how     => Apache::TAKE1,
+    errmsg       => 'ClickPathFriendlySessionsFile filename',
+   },
+   {
+    name         => '<ClickPathFriendlySessions',
+    func         => __PACKAGE__ . '::ClickPathFriendlySessions',
+    req_override => Apache::RSRC_CONF,
+    args_how     => Apache::RAW_ARGS,
+    errmsg       => '<ClickPathFriendlySessions>
+name1 regexp1
+name2 regexp2
+...
+</ClickPathFriendlySessions>',
+   },
+   {
+    name         => '</ClickFriendlySessions>',
+    func         => __PACKAGE__ . '::ClickPathFriendlySessionsEND',
+    req_override => Apache::OR_ALL,
+    args_how     => Apache::NO_ARGS,
+    errmsg       => '</ClickPathFriendlySessions> without <ClickPathFriendlySessions>',
+   },
+   {
+    name         => 'ClickPathMachine',
+    func         => __PACKAGE__ . '::ClickPathMachine',
+    req_override => Apache::RSRC_CONF,
+    args_how     => Apache::RAW_ARGS,
+    errmsg       => 'ClickPathMachine string',
+   },
   );
 Apache::Module::add(__PACKAGE__, \@directives);
 
 sub ClickPathSessionPrefix {
   my($I, $parms, $arg)=@_;
-  $I->{__PACKAGE__."ClickPathSessionPrefix"}=$arg;
+  $I->{"ClickPathSessionPrefix"}=$arg;
 }
 
 sub ClickPathMaxSessionAge {
   my($I, $parms, $arg)=@_;
   die "ERROR: Argument to ClickPathMaxSessionAge must be a number\n"
     unless( $arg=~/^\d+$/ );
-  $I->{__PACKAGE__."ClickPathMaxSessionAge"}=$arg;
+  $I->{"ClickPathMaxSessionAge"}=$arg;
+}
+
+sub ClickPathUAExceptionsFile {
+  my($I, $parms, $arg)=@_;
+  $I->{"ClickPathUAExceptionsFile"}=$arg;
+}
+
+sub _parse_UAExceptions {
+  my $conf=shift;
+  my $a=[];
+  foreach my $line (split /\r?\n/, $conf) {
+    if( $line=~/^\s*(\w+):?\s+(.+?)\s*$/ ) {
+      push @{$a}, [$1, qr/$2/];
+    }
+  }
+  return $a;
 }
 
 sub ClickPathUAExceptions {
   my($I, $parms, @args)=@_;
 
-  my $a=$I->{__PACKAGE__."ClickPathUAExceptions"}=[];
-  foreach my $line (split /\r?\n/, $parms->directive->as_string) {
-    if( $line=~/^\s*(\w+)\s+(.+?)\s*$/ ) {
-      push @{$a}, [$1, qr/$2/];
-    }
-  }
+  $I->{"ClickPathUAExceptions"}
+    =_parse_UAExceptions( $parms->directive->as_string );
 }
 
 sub ClickPathUAExceptionsEND {
@@ -90,12 +141,133 @@ sub ClickPathUAExceptionsEND {
   die "ERROR: </ClickPathUAExceptions> without <ClickPathUAExceptions>\n";
 }
 
+sub ClickPathFriendlySessionsFile {
+  my($I, $parms, $arg)=@_;
+  $I->{"ClickPathFriendlySessionsFile"}=$arg;
+}
+
+sub _parse_FriendlySessions {
+  my $conf=shift;
+  my $t={};
+  my $r={};
+
+  foreach my $l (split /\r?\n/, $conf) {
+
+    next unless( $l=~/^\s*(\S+)\s+	# $1: friendly REMOTE_HOST
+                      (			# $2: list of "uri( number )" or
+                       (?:		#     "param( name )" statements
+		        (?:uri|param)\s*
+		        \(
+		          \s*\w+\s*
+                        \)\s*
+                       )+
+                      )
+                      (?:\s*(\w+))?	# $3: opt. name, default=REMOTE_HOST
+                     /x );
+
+    my ($rem_host, $stmt_list, $name)=($1, $2, $3);
+    $name=$rem_host unless( defined $name );
+
+    my @stmts;
+    while( $stmt_list=~/(uri|param)\s*\(\s*(\w+)\s*\)/g ) {
+      push @stmts, [$1, $2];
+    }
+
+    $t->{$rem_host}=[[@stmts], $name];
+    $r->{$name}=$rem_host;
+  }
+
+  return $t, $r;
+}
+
+sub ClickPathFriendlySessions {
+  my($I, $parms, @args)=@_;
+
+  @{$I}{"ClickPathFriendlySessionsTable",
+	"ClickPathFriendlySessionsReverse"}
+    =_parse_FriendlySessions( $parms->directive->as_string );
+}
+
+sub ClickPathFriendlySessionsEND {
+  my($I, $parms, $arg)=@_;
+  die "ERROR: </ClickPathFriendlySessions> without <ClickPathFriendlySessions>\n";
+}
+
+sub ClickPathMachine {
+  my($I, $parms, $arg)=@_;
+  die "ClickPathMachine [name] -- name consist of letters, digits or _\n"
+    unless( $arg=~/^\w*$/ );
+
+  $I->{"ClickPathMachine"}=$arg;
+}
+
+sub _get_ua_exc {
+  my $cf=shift;
+
+  ########### checking for UA Exceptions #################################
+  # a ClickPathUAExceptionsFile directive overrides ClickPathUAExceptions
+  # a ClickPathUAExceptionsFile is read every time it has been changed
+  ########################################################################
+
+  my ($fh, @stat);
+  if( length $cf->{"ClickPathUAExceptionsFile"} and
+      @stat=stat $cf->{"ClickPathUAExceptionsFile"} and
+      $stat[9]>$cf->{"ClickPathUAExceptionsFile_read_time"} and
+      open $fh, $cf->{"ClickPathUAExceptionsFile"} ) {
+    $cf->{"ClickPathUAExceptionsFile_read_time"}=$stat[9];
+
+    local $/;
+    $cf->{"ClickPathUAExceptions_list"}
+      =_parse_UAExceptions( scalar( <$fh> ) );
+    close $fh;
+    return $cf->{"ClickPathUAExceptions_list"};
+  } elsif( @stat and
+	   $stat[9]<=$cf->{"ClickPathUAExceptionsFile_read_time"} ) {
+    return $cf->{"ClickPathUAExceptions_list"};
+  } else {
+    return $cf->{"ClickPathUAExceptions"};
+  }
+}
+
+sub _get_friendly_session {
+  my $cf=shift;
+
+  ########### checking for Friendly Sessions #############################
+  # a ClickPathFriendlySessionsFile directive overrides
+  # ClickPathFriendlySessions
+  # a ClickPathFriendlySessionsFile is read every time it has been changed
+  ########################################################################
+
+  my ($fh, @stat);
+  if( length $cf->{"ClickPathFriendlySessionsFile"} and
+      @stat=stat $cf->{"ClickPathFriendlySessionsFile"} and
+      $stat[9]>$cf->{"ClickPathFriendlySessionsFile_read_time"} and
+      open $fh, $cf->{"ClickPathFriendlySessionsFile"} ) {
+    $cf->{"ClickPathFriendlySessionsFile_read_time"}=$stat[9];
+
+    local $/;
+    @{$cf}{"ClickPathFriendlySessionsFileTable",
+	   "ClickPathFriendlySessionsFileReverse"}
+      =_parse_FriendlySessions( scalar( <$fh> ) );
+    close $fh;
+    return @{$cf}{"ClickPathFriendlySessionsFileTable",
+		  "ClickPathFriendlySessionsFileReverse"};
+  } elsif( @stat and
+	   $stat[9]<=$cf->{"ClickPathFriendlySessionsFile_read_time"} ) {
+    return @{$cf}{"ClickPathFriendlySessionsFileTable",
+		  "ClickPathFriendlySessionsFileReverse"};
+  } else {
+    return @{$cf}{"ClickPathFriendlySessionsTable",
+		  "ClickPathFriendlySessionsReverse"};
+  }
+}
+
 sub handler {
   my $r=shift;
 
   my $cf=Apache::Module::get_config(__PACKAGE__,
 				    $r->server, $r->per_dir_config);
-  my $tag=$cf->{__PACKAGE__."ClickPathSessionPrefix"}
+  my $tag=$cf->{"ClickPathSessionPrefix"}
     or return Apache::DECLINED;
   $r->pnotes( __PACKAGE__.'::tag'=>$tag );
 
@@ -110,6 +282,10 @@ sub handler {
   if( $pr ) {
     my $session=$pr->subprocess_env( 'SESSION' );
     if( length $session ) {
+      $r->subprocess_env( REMOTE_SESSION=>
+			  $pr->subprocess_env( 'REMOTE_SESSION' ) );
+      $r->subprocess_env( REMOTE_SESSION_HOST=>
+			  $pr->subprocess_env( 'REMOTE_SESSION_HOST' ) );
       $r->subprocess_env( CGI_SESSION=>
 			  $pr->subprocess_env( 'CGI_SESSION' ) );
       $r->subprocess_env( SESSION_START=>
@@ -136,16 +312,31 @@ sub handler {
     # decode session
     $session=~tr[N-Za-z0-9@\-,A-M][A-Za-z0-9@\-,];
     my @l=split /,/, $session, 3;
+    # extract remote session
+    my $rtab;
+    (undef, $rtab)=_get_friendly_session( $cf );
+    $rtab={} unless( $rtab );
+    if( @l==3 and exists $rtab->{$l[1]} ) {
+      my %h=('**'=>'*', '*!'=>'!', '*.'=>'=', '!'=>"\n");
+      $l[2]=~s/(\*[*!.]|!)/$h{$1}/ge;
+      $r->subprocess_env( REMOTE_SESSION=>$l[2] );
+      $r->subprocess_env( REMOTE_SESSION_HOST=>$rtab->{$l[1]} );
+    } else {
+      $r->subprocess_env->unset( 'REMOTE_SESSION' );
+      $r->subprocess_env->unset( 'REMOTE_SESSION_HOST' );
+    }
     # extract session start time
     $l[0]=~tr[@\-][+/];
     @l=split /:/, $l[0], 2;	# $l[0]: IP Addr, $l[1]: session
     @l=unpack "NNnNn", MIME::Base64::decode_base64( $l[1] );
 
-    my $maxage=$cf->{__PACKAGE__."ClickPathMaxSessionAge"};
+    my $maxage=$cf->{"ClickPathMaxSessionAge"};
     my $age=$r->request_time-$l[0];
     if( ($maxage>0 and $age>$maxage) or $age<0 ) {
       $r->subprocess_env->unset( 'SESSION' );
       $r->subprocess_env->unset( 'CGI_SESSION' );
+      $r->subprocess_env->unset( 'REMOTE_SESSION' );
+      $r->subprocess_env->unset( 'REMOTE_SESSION_HOST' );
       goto NEWSESSION;
     } else {
       $r->subprocess_env( SESSION_START=>$l[0] );
@@ -159,7 +350,7 @@ sub handler {
     my $ua=$r->headers_in->{'User-Agent'};
     my $disable='';
 
-    foreach my $el (@{$cf->{__PACKAGE__."ClickPathUAExceptions"} || []}) {
+    foreach my $el (@{_get_ua_exc( $cf )}) {
       if( $ua=~/$el->[1]/ ) {
 	$disable=$el->[0];
 	last;
@@ -174,15 +365,33 @@ sub handler {
       $r->subprocess_env->unset( 'REMOTE_SESSION' );
       $r->subprocess_env->unset( 'REMOTE_SESSION_HOST' );
     } else {
-      if( $ref=~s!^\w+://([^/]+)/!/! ) {
+      if( $ref=~s!^\w+://([^/]+)/+!/! ) {
 	my $host=$1;
-	my $tab;
-	my $regexp=($tab || {})->{$host};
+	my ($tab)=_get_friendly_session( $cf );
+	my $el=($tab || {})->{$host};
 
-	if( $regexp and $ref=~/$regexp->[0]/ ) {
-	  $r->subprocess_env( REMOTE_SESSION=>$1 );
+	if( $el ) {
+	  local $_;
+	  my $args;
+	  ($ref, $args)=split /\?/, $ref, 2;
+	  my @uri=split m!/+!, $ref;
+	  my %args=map {
+	    my ($k, $v)=split /=/;
+	    length( $k ) ? ($k=>$v) : ();
+	  } split /[;&]/, $args;
+
+	  my @remote_session=map {
+	    $_->[0] eq 'uri' ? $uri[$_->[1]] : $_->[1].'='.$args{$_->[1]};
+	  } @{$el->[0]};
+
+	  my $remote_session=join( "\n", @remote_session );
+	  $r->subprocess_env( REMOTE_SESSION=>$remote_session );
 	  $r->subprocess_env( REMOTE_SESSION_HOST=>$host );
-	  $ref=$regexp->[1].','.$1;
+
+	  my %h=('*'=>'**', '!'=>'*!', '='=>'*.', "\n"=>'!');
+	  $remote_session=~s/([*!=\n])/$h{$1}/ge;
+
+	  $ref=$el->[1].','.$remote_session;
 	} else {
 	  $r->subprocess_env->unset( 'REMOTE_SESSION' );
 	  $r->subprocess_env->unset( 'REMOTE_SESSION_HOST' );
@@ -194,10 +403,15 @@ sub handler {
 	$ref='';
       }
 
-      my $serverip=$r->connection->local_addr->ip_get;
-      my $session_ip=MIME::Base64::encode_base64
-	( pack( 'C*', split /\./, $serverip, 4 ), '' );
-      $session_ip=~s/={0,2}$//;
+      my $session_ip;
+      if( exists $cf->{"ClickPathMachine"} ) {
+	$session_ip=$cf->{"ClickPathMachine"};
+      } else {
+	my $serverip=$r->connection->local_addr->ip_get;
+	$session_ip=MIME::Base64::encode_base64
+	  ( pack( 'C*', split /\./, $serverip, 4 ), '' );
+	$session_ip=~s/={0,2}$//;
+      }
       my $session=pack( 'NNnN',
 			$r->request_time, $$, $rcounter++,
 			$r->connection->id );
@@ -228,7 +442,7 @@ sub OutputFilter {
   my $host;
   my $sprefix;
   my $context;
-  my ($re, $re1, $re2, $re3, $the_request);
+  my ($re, $re1, $re2, $re3, $re4, $the_request);
 
 
   unless ($f->ctx) {
@@ -303,7 +517,7 @@ sub OutputFilter {
       # Wenn die Session neu ist, dann muessen auch relative Links
       # reaendert werden
       $re1=qr,(			# $1 start
-	       <\s*a\s+		# <a> start
+	       <\s*a(?:rea)?\s+	# <a> start
 	       .*?		# evtl. target=...
                \bhref\s*=\s*	# href=
 	       (["'])		# " oder ': Das ist $2 oder \2 (siehe unten)
@@ -364,9 +578,24 @@ sub OutputFilter {
 	       \2		# das schließende Quote: $2
 	      )			# $3 ende
 	     ,xi;
+
+      $re4=qr,(			# $1 start
+	       <\s*i?frame\s+	# <a> start
+	       [^>]*?		# evtl. target=...
+               \bsrc\s*=\s*	# href=
+	       (["'])		# " oder ': Das ist $2 oder \2 (siehe unten)
+	       (?:https?://\Q$host\E)?	# evtl. Host
+	      )			# Das alles ist in $1
+	      (?:/+\Q$sprefix\E[^/]+)?
+	      (			# $3 start
+	       (?!\w+://).*?	# ein beliebiger nicht mit http:// o.ae.
+				#   beginnender String (moeglichst kurz)
+	       \2		# das schließende Quote: $2
+	      )			# $3 ende
+	     ,xi;
     } else {
       $re1=qr,(			# $1 start
-	       <\s*a\s+		# <a> start
+	       <\s*a(?:rea)?\s+	# <a> start
 	       .*?		# evtl. target=...
                \bhref\s*=\s*	# href=
 	       (["'])		# " oder ': Das ist $2 oder \2 (siehe unten)
@@ -427,16 +656,34 @@ sub OutputFilter {
 	       \2		# das schließende Quote: $2
 	      )			# $3 ende
 	     ,xi;
+
+      $re4=qr,(			# $1 start
+	       <\s*i?frame\s+	# <a> start
+	       [^>]*?		# evtl. target=...
+               \bsrc\s*=\s*	# href=
+	       (["'])		# " oder ': Das ist $2 oder \2 (siehe unten)
+	       (?:https?://\Q$host\E)?	# evtl. Host
+	      )			# Das alles ist in $1
+	      (?:/+\Q$sprefix\E[^/]+)?
+	      (			# $3 start
+	       /.*?		# ein beliebiger /
+				#   beginnender String (moeglichst kurz)
+	       \2		# das schließende Quote: $2
+	      )			# $3 ende
+	     ,xi;
     }
 
     # store the configuration
-    $f->ctx( +{ extra => '',
+    $f->ctx( +{
+	        extra => '',
 		sess  => $sess,
 		req   => $the_request,
 		re    => qr/(<[^>]*)$/,
 		re1   => $re1,
 		re2   => $re2,
-		re3   => $re3 } );
+		re3   => $re3,
+		re4   => $re4,
+	      } );
 
     # output filters that alter content are responsible for removing
     # the Content-Length header, but we only need to do this once.
@@ -450,6 +697,7 @@ sub OutputFilter {
   $re1=$context->{re1};
   $re2=$context->{re2};
   $re3=$context->{re3};
+  $re4=$context->{re4};
   $re=$context->{re};
   $the_request=$context->{req};
 
@@ -481,6 +729,10 @@ sub OutputFilter {
                       ? $1.$sess.$3
                       : $1.$sess.$the_request.$3
                      !ge;
+      $buffer=~s!$re4!(substr($3, 0, 1) eq '/')
+                      ? $1.$sess.$3
+                      : $1.$sess.$the_request.$3
+                     !ge;
     } else {
       $buffer=~s!$re1!$1$sess$3!g;
       $buffer=~s!$re2!(length($2) or length($7))
@@ -488,6 +740,7 @@ sub OutputFilter {
 		      : $1.$2.$4.$6.$7
                      !ge;
       $buffer=~s!$re3!$1$sess$3!g;
+      $buffer=~s!$re4!$1$sess$3!g;
     }
 
     $f->print($buffer);
@@ -604,6 +857,15 @@ the request time of the request starting a session in seconds since 1/1/1970.
 
 the session age in seconds, i.e. CURRENT_TIME - SESSION_START.
 
+=item B<REMOTE_SESSION>
+
+in case a friendly session was caught this variable contains it, see below.
+
+=item B<REMOTE_SESSION_HOST>
+
+in case a friendly session was caught this variable contains the host it
+belongs to, see below.
+
 =back
 
 =head2 The Output Filter
@@ -621,7 +883,13 @@ In this case the filter patches the following HTML tags:
 
 =item B<E<lt>a ... href="LINK" ...E<gt>>
 
+=item B<E<lt>area ... href="LINK" ...E<gt>>
+
 =item B<E<lt>form ... action="LINK" ...E<gt>>
+
+=item B<E<lt>frame ... src="LINK" ...E<gt>>
+
+=item B<E<lt>iframe ... src="LINK" ...E<gt>>
 
 =item B<E<lt>meta ... http-equiv="refresh" ... content="N; URL=LINK" ...E<gt>>
 
@@ -651,6 +919,26 @@ if a session gets older than this value (in seconds) a new one is created
 instead of continuing the old. Values of about a few hours should be good,
 eg. 18000 = 5 h.
 
+=item B<ClickPathMachine>
+
+set this machine's name. The name is used with load balancers. Each
+machine of a farm is assigned a unique name. That makes session identifiers
+unique across the farm.
+
+If this directive is omitted a compressed form (6 Bytes) of the server's
+IP address is used. Thus the session is unique across the Internet.
+
+In environments with only one server this directive can be given without
+an argument. Then an empty name is used and the session is unique on
+the server.
+
+If possible use short or empty names. It saves bandwidth.
+
+A name consists of letters, digits and underscores (_).
+
+The generated session identifier contains the name in a slightly scrambled
+form to slightly hide your infrastructure.
+
 =item B<ClickPathUAExceptions>
 
 this is a container directive like C<< <Location> >> or C<< <Directory> >>.
@@ -667,23 +955,85 @@ C<Google>. Now if a request comes in with an C<UserAgent> header containing
 C<Googlebot> no session is generated. Instead the environment variable
 C<SESSION> is set to C<Google> and C<CGI_SESSION> is emtpy.
 
+=item B<ClickPathUAExceptionsFile>
+
+this directive takes a filename as argument. The file's syntax and semantic
+are the same as for C<ClickPathUAExceptions>. The file is reread every time
+is has been changed avoiding server restarts after configuration changes at
+the prize of memory consumption.
+
+=item B<ClickPathFriendlySessions>
+
+this is also a container directive. It describes friendly sessions. What is
+a friendly session? Well, suppose you have a WEB shop running on
+C<shop.tld.org> and your company site running on C<www.tld.org>. The shop
+does it's own URL based session management but there are links from the
+shop to the company site and back. Wouldn't it be nice if a customer once
+he has stepped into the shop could click links to the company without loosing
+the shopping session? This is where friendly sessions come in.
+
+Since your shop's session management is URL based the C<Referer> seen
+by C<www.tld.org> will be something like
+
+ https://shop.tld.org/cgi-bin/shop.pl?session=sdafsgr;clusterid=25
+
+(if session and clusterid are passed as CGI parameters) or
+
+ https://shop.tld.org/C:25/S:sdafsgr/cgi-bin/shop.pl
+
+(if session and clusterid are passed as URL parts) or something mixed.
+
+Assuming that C<clusterid> and C<session> both identify the session on
+C<shop.tld.org> C<Apache::ClickPath> can extract them, encode them in it's
+own session and place them in environment variables.
+
+Each line in the C<ClickPathFriendlySessions> section decribes one friendly
+site. The line consists of the friendly hostname, a list of URL parts or
+CGI parameters identifying the friendly session and an optional short name
+for this friend, eg:
+
+ shop.tld.org uri(1) param(session) shop
+
+This means sessions at C<shop.tld.org> are identified by the combination
+of 1st URL part after the leading slash (/) and a CGI parameter named
+C<session>.
+
+If now a request comes in with a C<Referer> of
+C<http://shop.tld.org/25/bin/shop.pl?action=showbasket;session=213>
+the C<REMOTE_SESSION> environment variable will contain 2 lines:
+
+ 25
+ session=213
+
+Their order is determined by the order of C<uri()> and C<param()> statements
+in the configuration section between the hostname and the short name. The
+C<REMOTE_SESSION_HOST> environment variable will contain the host name the
+session belongs to.
+
+Now a CGI script or a modperl handler or something similar can fetch the
+environment and build links back to C<shop.tld.org>. Instead of directly
+linking back to the shop your links then point to that script. The script
+then puts out an appropriate redirect.
+
+=item B<ClickPathFriendlySessionsFile>
+
+this directive takes a filename as argument. The file's syntax and semantic
+are the same as for C<ClickPathFriendlySessions>. The file is reread every time
+is has been changed avoiding server restarts after configuration changes at
+the prize of memory consumption.
+
 =back
 
 =head2 Working with a load balancer
-
-To generate a session identifier almost the same information is used as
-C<mod_uniqueid> does only the order differs. A session identifier always
-starts with 6 characters followed by a colon. These 6 characters are the
-machine's encoded IP address. The colon is syntactic sugar. It is needed
-for some load balancers.
 
 Most load balancers are able to map a request to a particular machine
 based on a part of the request URI. They look for a prefix followed
 by a given number of characters or until a suffix is found. The string
 between identifies the machine to route the request to.
 
-So with C<Apache::ClickPath>'s session meet these requirements. The
-prefix is the C<ClickPathSessionPrefix> the suffix is a single colon.
+The name set with C<ClickPathMachine> can be used by a load balancer.
+It is immediately following the session prefix and finished by a single
+colon. The default name is always 6 bytes long.
 
 =head2 Logging
 

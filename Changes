@@ -3,3 +3,13 @@ Revision history for Perl extension Apache::ClickPath.
 1.0   Mon Dec 13 10:22:15 CET 2004
 	* Torsten Foertsch <torsten.foertsch@gmx.net>
 	- original version
+
+1.1   Tue Jan 11 14:50:20 CET 2005
+	* Torsten Foertsch <torsten.foertsch@gmx.net>
+	- <area> (image maps) support
+	- <frame> und <iframe> support
+	- ClickPathMachine directive
+	- ClickPathUAExceptions directive
+	- ClickPathFriendlySessions directive
+	- ClickPathUAExceptionsFile directive
+	- ClickPathFriendlySessionsFile directive

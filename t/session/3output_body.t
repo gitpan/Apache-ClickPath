@@ -5,7 +5,7 @@ use Test::More;
 use Apache::TestUtil;
 use Apache::TestRequest 'GET_BODY';
 
-plan tests => 28;
+plan tests => 40;
 
 Apache::TestRequest::module('default');
 
@@ -32,10 +32,22 @@ open F, ">t/htdocs/tmp/x.html" and print F <<"EOF";
     <a href="http://$hostport/index1.html">2</a>
     <a href="../index1.html">3</a>
     <a href="http://x.y/index1.html">4</a>
+    <area href="/index1.html">1</area>
+    <area href="http://$hostport/index1.html">2</area>
+    <AREA title='klaus' href="../index1.html" coords="1,2,3,4,5">3</AREA>
+    <area title="klaus" href="http://x.y/index1.html" coords='1,2,3,4,5'>4</area>
     <form action="/index1.html">1</form>
     <form action="http://$hostport/index1.html">2</form>
     <form action="../index1.html">3</form>
     <form action="http://x.y/index1.html">4</form>
+    <frame src="/index1.html">1</frame>
+    <FRAME blub="bla" SRC="http://$hostport/index1.html">2</frame>
+    <frame src="../index1.html">3</frame>
+    <frame src="http://x.y/index1.html">4</frame>
+    <iframe src="/index1.html">1</iframe>
+    <iframe src="http://$hostport/index1.html">2</iframe>
+    <iframe src="../index1.html">3</iframe>
+    <iframe src="http://x.y/index1.html">4</iframe>
   </body>
 </html>
 EOF
@@ -64,6 +76,15 @@ ok( t_cmp( $got, qr!<a href="/-S:\S+/tmp/\.\./index1\.html">3</a>! ),
 ok( t_cmp( $got, qr!<a href="http://x\.y/index1\.html">4</a>! ),
     "a 4" );
 
+ok( t_cmp( $got, qr!<area href="/-S:\S+/index1\.html">1</area>! ),
+    "area 1" );
+ok( t_cmp( $got, qr!<area href="http://\Q$hostport\E/-S:\S+/index1\.html">2</area>! ),
+    "area 2" );
+ok( t_cmp( $got, qr!<AREA title='klaus' href="/-S:\S+/tmp/\.\./index1\.html" coords="1,2,3,4,5">3</AREA>! ),
+    "area 3" );
+ok( t_cmp( $got, qr!<area title="klaus" href="http://x\.y/index1\.html" coords='1,2,3,4,5'>4</area>! ),
+    "area 4" );
+
 ok( t_cmp( $got, qr!<form action="/-S:\S+/index1\.html">1</form>! ),
     "form 1" );
 ok( t_cmp( $got, qr!<form action="http://\Q$hostport\E/-S:\S+/index1\.html">2</form>! ),
@@ -74,6 +95,7 @@ ok( t_cmp( $got, qr!<form action="http://x.y/index1.html">4</form>! ),
     "form 4" );
 
 my $session=GET_BODY( "/TestSession__1session_generation?CGI_SESSION" );
+chomp $session;
 $session=~s/^.*?=//;
 
 $got=GET_BODY( "$session/tmp/x.html", redirect_ok=>0 );
@@ -107,6 +129,24 @@ ok( t_cmp( $got, qr!<form action="\.\./index1\.html">3</form>! ),
     "form 3" );
 ok( t_cmp( $got, qr!<form action="http://x.y/index1.html">4</form>! ),
     "form 4" );
+
+ok( t_cmp( $got, qr!<frame src="\Q$session\E/index1\.html">1</frame>! ),
+    "frame 1" );
+ok( t_cmp( $got, qr!<FRAME blub="bla" SRC="http://\Q$hostport$session\E/index1\.html">2</frame>! ),
+    "frame 2" );
+ok( t_cmp( $got, qr!<frame src="\.\./index1\.html">3</frame>! ),
+    "frame 3" );
+ok( t_cmp( $got, qr!<frame src="http://x.y/index1.html">4</frame>! ),
+    "frame 4" );
+
+ok( t_cmp( $got, qr!<iframe src="\Q$session\E/index1\.html">1</iframe>! ),
+    "iframe 1" );
+ok( t_cmp( $got, qr!<iframe src="http://\Q$hostport$session\E/index1\.html">2</iframe>! ),
+    "iframe 2" );
+ok( t_cmp( $got, qr!<iframe src="\.\./index1\.html">3</iframe>! ),
+    "iframe 3" );
+ok( t_cmp( $got, qr!<iframe src="http://x.y/index1.html">4</iframe>! ),
+    "iframe 4" );
 
 # Local Variables: #
 # mode: cperl #

@@ -7,11 +7,13 @@ t/TEST.PL
 t/conf/extra.last.conf.in
 t/response/TestSession/1session_generation.pm
 t/response/TestSession/2output_headers.pm
+t/response/TestSession/7uaexceptionfile.pm
 t/session/1session_generation.t
 t/session/2output_headers.t
 t/session/3output_body.t
 t/session/4auto_index.t
 t/session/5internal_redirect.t
 t/session/6nosession.t
+t/session/7uaexceptionfile.t
 lib/Apache/ClickPath.pm
 META.yml                                 Module meta-data (added by MakeMaker)

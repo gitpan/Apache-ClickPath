@@ -83,6 +83,14 @@ DESCRIPTION
     CGI_SESSION_AGE
         the session age in seconds, i.e. CURRENT_TIME - SESSION_START.
 
+    REMOTE_SESSION
+        in case a friendly session was caught this variable contains it, see
+        below.
+
+    REMOTE_SESSION_HOST
+        in case a friendly session was caught this variable contains the
+        host it belongs to, see below.
+
   The Output Filter
     The output filter is entirely skipped if the translation handler had not
     set the "CGI_SESSION" environment variable.
@@ -94,7 +102,10 @@ DESCRIPTION
     In this case the filter patches the following HTML tags:
 
     <a ... href="LINK" ...>
+    <area ... href="LINK" ...>
     <form ... action="LINK" ...>
+    <frame ... src="LINK" ...>
+    <iframe ... src="LINK" ...>
     <meta ... http-equiv="refresh" ... content="N; URL=LINK" ...>
         In all cases if "LINK" starts with a slash the current value of
         "CGI_SESSION" is prepended. If "LINK" starts with "http://HOST/" (or
@@ -116,6 +127,26 @@ DESCRIPTION
         created instead of continuing the old. Values of about a few hours
         should be good, eg. 18000 = 5 h.
 
+    ClickPathMachine
+        set this machine's name. The name is used with load balancers. Each
+        machine of a farm is assigned a unique name. That makes session
+        identifiers unique across the farm.
+
+        If this directive is omitted a compressed form (6 Bytes) of the
+        server's IP address is used. Thus the session is unique across the
+        Internet.
+
+        In environments with only one server this directive can be given
+        without an argument. Then an empty name is used and the session is
+        unique on the server.
+
+        If possible use short or empty names. It saves bandwidth.
+
+        A name consists of letters, digits and underscores (_).
+
+        The generated session identifier contains the name in a slightly
+        scrambled form to slightly hide your infrastructure.
+
     ClickPathUAExceptions
         this is a container directive like "<Location>" or "<Directory>".
         The container content lines consist of a name and a regular
@@ -132,20 +163,81 @@ DESCRIPTION
         environment variable "SESSION" is set to "Google" and "CGI_SESSION"
         is emtpy.
 
-  Working with a load balancer
-    To generate a session identifier almost the same information is used as
-    "mod_uniqueid" does only the order differs. A session identifier always
-    starts with 6 characters followed by a colon. These 6 characters are the
-    machine's encoded IP address. The colon is syntactic sugar. It is needed
-    for some load balancers.
+    ClickPathUAExceptionsFile
+        this directive takes a filename as argument. The file's syntax and
+        semantic are the same as for "ClickPathUAExceptions". The file is
+        reread every time is has been changed avoiding server restarts after
+        configuration changes at the prize of memory consumption.
 
+    ClickPathFriendlySessions
+        this is also a container directive. It describes friendly sessions.
+        What is a friendly session? Well, suppose you have a WEB shop
+        running on "shop.tld.org" and your company site running on
+        "www.tld.org". The shop does it's own URL based session management
+        but there are links from the shop to the company site and back.
+        Wouldn't it be nice if a customer once he has stepped into the shop
+        could click links to the company without loosing the shopping
+        session? This is where friendly sessions come in.
+
+        Since your shop's session management is URL based the "Referer" seen
+        by "www.tld.org" will be something like
+
+         https://shop.tld.org/cgi-bin/shop.pl?session=sdafsgr;clusterid=25
+
+        (if session and clusterid are passed as CGI parameters) or
+
+         https://shop.tld.org/C:25/S:sdafsgr/cgi-bin/shop.pl
+
+        (if session and clusterid are passed as URL parts) or something
+        mixed.
+
+        Assuming that "clusterid" and "session" both identify the session on
+        "shop.tld.org" "Apache::ClickPath" can extract them, encode them in
+        it's own session and place them in environment variables.
+
+        Each line in the "ClickPathFriendlySessions" section decribes one
+        friendly site. The line consists of the friendly hostname, a list of
+        URL parts or CGI parameters identifying the friendly session and an
+        optional short name for this friend, eg:
+
+         shop.tld.org uri(1) param(session) shop
+
+        This means sessions at "shop.tld.org" are identified by the
+        combination of 1st URL part after the leading slash (/) and a CGI
+        parameter named "session".
+
+        If now a request comes in with a "Referer" of
+        "http://shop.tld.org/25/bin/shop.pl?action=showbasket;session=213"
+        the "REMOTE_SESSION" environment variable will contain 2 lines:
+
+         25
+         session=213
+
+        Their order is determined by the order of "uri()" and "param()"
+        statements in the configuration section between the hostname and the
+        short name. The "REMOTE_SESSION_HOST" environment variable will
+        contain the host name the session belongs to.
+
+        Now a CGI script or a modperl handler or something similar can fetch
+        the environment and build links back to "shop.tld.org". Instead of
+        directly linking back to the shop your links then point to that
+        script. The script then puts out an appropriate redirect.
+
+    ClickPathFriendlySessionsFile
+        this directive takes a filename as argument. The file's syntax and
+        semantic are the same as for "ClickPathFriendlySessions". The file
+        is reread every time is has been changed avoiding server restarts
+        after configuration changes at the prize of memory consumption.
+
+  Working with a load balancer
     Most load balancers are able to map a request to a particular machine
     based on a part of the request URI. They look for a prefix followed by a
     given number of characters or until a suffix is found. The string
     between identifies the machine to route the request to.
 
-    So with "Apache::ClickPath"'s session meet these requirements. The
-    prefix is the "ClickPathSessionPrefix" the suffix is a single colon.
+    The name set with "ClickPathMachine" can be used by a load balancer. It
+    is immediately following the session prefix and finished by a single
+    colon. The default name is always 6 bytes long.
 
   Logging
     The most important part of user tracking and clickstreams is logging.

@@ -33,6 +33,9 @@ WriteMakefile(
 			 },
     depend            => {
 			 },
+    dist              => {
+			  PREOP => './mk_README.sh',
+			 },
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Apache/ClickPath.pm', # retrieve abstract from module
        AUTHOR         => 'Torsten Förtsch <torsten.foertsch@gmx.net>') : ()),

@@ -5,7 +5,7 @@ use Test::More;
 use Apache::TestUtil;
 use Apache::TestRequest 'GET_BODY';
 
-plan tests => 6;
+plan tests => 10;
 
 Apache::TestRequest::module('default');
 
@@ -43,6 +43,35 @@ ok( do { sleep 5;
 	 ($age=~/^SESSION_AGE=0$/);
        },
     'MaxSessionAge hit' );
+
+Apache::TestRequest::module('Machine');
+
+$config   = Apache::Test::config();
+$hostport = Apache::TestRequest::hostport($config) || '';
+t_debug("connecting to $hostport");
+
+$session=GET_BODY( "/TestSession__1session_generation?CGI_SESSION" );
+chomp $session;
+ok $session=~s/^CGI_SESSION=// && t_cmp( $session, qr!^/-S:6r56:.+!m ),
+   "ClickPathMachine directive at work";
+
+ok t_cmp( GET_BODY( "$session/TestSession__1session_generation?CGI_SESSION" ),
+	  qr/^CGI_SESSION=$session/m ), "ClickPathMachine directive at work 2";
+
+Apache::TestRequest::module('NullMachine');
+
+$config   = Apache::Test::config();
+$hostport = Apache::TestRequest::hostport($config) || '';
+t_debug("connecting to $hostport");
+
+$session=GET_BODY( "/TestSession__1session_generation?CGI_SESSION" );
+chomp $session;
+ok $session=~s/^CGI_SESSION=// && t_cmp( $session, qr!^/-S::.+!m ),
+   "empty ClickPathMachine directive at work";
+
+ok t_cmp( GET_BODY( "$session/TestSession__1session_generation?CGI_SESSION" ),
+	  qr/^CGI_SESSION=$session/m ),
+   "empty ClickPathMachine directive at work 2";
 
 # Local Variables: #
 # mode: cperl #
