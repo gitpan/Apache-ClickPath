@@ -22,7 +22,7 @@ use Apache::Const -compile => qw(DECLINED OK
 use Time::HiRes ();
 use MIME::Base64 ();
 
-our $VERSION = '1.1b';
+our $VERSION = '1.1c';
 our $rcounter=int rand 0x10000;
 
 my @directives=
@@ -525,7 +525,7 @@ sub OutputFilter {
 	      )			# Das alles ist in $1
 	      (?:/+\Q$sprefix\E[^/]+)?
 	      (			# $3 start
-	       (?!\w+:).*?	# ein beliebiger nicht mit http:// o.ae.
+	       (?!(?:\w+:|\043)).*? # ein beliebiger nicht mit http:// o.ae.
 				#   beginnender String (moeglichst kurz)
 	       \2		# das schließende Quote: $2
 	      )			# $3 ende

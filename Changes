@@ -23,3 +23,7 @@ Revision history for Perl extension Apache::ClickPath.
 	* Torsten Foertsch <torsten.foertsch@gmx.net>
 	- Bugfix: mailto:, javascript: links are not considered to be
 	  relative links anymore
+
+1.1c  Thu Jan 27 21:45:44 CET 2005
+	* Torsten Foertsch <torsten.foertsch@gmx.net>
+	- Bugfix: now anchor links <a href="#top"> also work
