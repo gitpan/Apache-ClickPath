@@ -5,7 +5,7 @@ use Test::More;
 use Apache::TestUtil;
 use Apache::TestRequest 'GET_BODY';
 
-plan tests => 11;
+plan tests => 12;
 
 Apache::TestRequest::module('default');
 
@@ -81,6 +81,29 @@ t_debug("connecting to $hostport");
 
 ok t_cmp( GET_BODY( "/TestSession__1session_generation?SESSION" ),
 	  qr/^SESSION=.+/m,  ), "SESSION exists";
+
+mkdir "t/htdocs/tmp2";
+open F, ">t/htdocs/tmp2/index.html" and print F <<"EOF";
+<html>
+<body>
+	<p><a href="/klaus/view/index.shtml">link</a></p>
+</body>
+</html>
+EOF
+close F;
+
+Apache::TestRequest::module('default');
+
+$config   = Apache::Test::config();
+$hostport = Apache::TestRequest::hostport($config) || '';
+t_debug("connecting to $hostport");
+
+$session=GET_BODY( "/TestSession__1session_generation?CGI_SESSION" );
+chomp $session;
+$session=~s/^CGI_SESSION=//;
+ok t_cmp( GET_BODY( "$session/tmp2/" ),
+	  qr~<a href="\Q$session\E/klaus/view/index.shtml~,  ),
+  "SESSION with sub-request";
 
 # Local Variables: #
 # mode: cperl #

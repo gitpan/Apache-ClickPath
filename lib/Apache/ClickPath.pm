@@ -24,7 +24,7 @@ use MIME::Base64 ();
 
 use Apache::ClickPath::_parse ();
 
-our $VERSION = '1.2';
+our $VERSION = '1.2a';
 our $rcounter=int rand 0x10000;
 
 my @directives=
@@ -241,7 +241,7 @@ sub handler {
   # examin it.
   my $newsession=1;
 
-  my $pr=$r->prev;
+  my $pr=$r->main || $r->prev;
   my $ref=$r->headers_in->{Referer} || "";
 
   if( $pr ) {

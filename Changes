@@ -39,3 +39,7 @@ Revision history for Perl extension Apache::ClickPath.
 	  "REFRESH" did not work
 	- Apache::ClickPath::_parse and Apache::ClickPath::Decode added
 	- decode_session.pl added
+
+1.2a  Mon Apr  4 10:30:07 CEST 2005
+	* Torsten Foertsch <torsten.foertsch@gmx.net>
+	- Bugfix: check for $r->main and $r->prev not only for $r->prev
