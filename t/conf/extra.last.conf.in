@@ -150,7 +150,22 @@ LogFormat "%h %l %u %t \"%m %U%q %H\" %>s %b \"%{Referer}i\" \"%{User-agent}i\" 
 <ClickPathFriendlySessions>
   param.friendly.org   param(ld) param ( id )   f
   uri.friendly.org     uri(1) uri ( 3 )         u
- mixed.friendly.org    param(ld) uri ( 3 )      m
+  mixed.friendly.org    param(ld) uri ( 3 )     m
 </ClickPathFriendlySessions>
 ClickPathFriendlySessionsFile "@ServerRoot@/FriendlySessions"
+</VirtualHost>
+
+<VirtualHost Without_UAExc>
+PerlTransHandler Apache::ClickPath
+ClickPathSessionPrefix "-S:"
+ClickPathMaxSessionAge 2
+PerlOutputFilterHandler Apache::ClickPath::OutputFilter
+<Directory "@ServerRoot@">
+Options Indexes Includes
+</Directory>
+<Directory "@DocumentRoot@/bin">
+Options Indexes Includes ExecCGI
+SetHandler cgi-script
+</Directory>
+LogFormat "%h %l %u %t \"%m %U%q %H\" %>s %b \"%{Referer}i\" \"%{User-agent}i\" \"%{SESSION}e\""
 </VirtualHost>

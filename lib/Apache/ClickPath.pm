@@ -22,7 +22,7 @@ use Apache::Const -compile => qw(DECLINED OK
 use Time::HiRes ();
 use MIME::Base64 ();
 
-our $VERSION = '1.1';
+our $VERSION = '1.1a';
 our $rcounter=int rand 0x10000;
 
 my @directives=
@@ -225,7 +225,7 @@ sub _get_ua_exc {
 	   $stat[9]<=$cf->{"ClickPathUAExceptionsFile_read_time"} ) {
     return $cf->{"ClickPathUAExceptions_list"};
   } else {
-    return $cf->{"ClickPathUAExceptions"};
+    return $cf->{"ClickPathUAExceptions"} || [];
   }
 }
 

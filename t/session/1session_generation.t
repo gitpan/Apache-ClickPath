@@ -5,7 +5,7 @@ use Test::More;
 use Apache::TestUtil;
 use Apache::TestRequest 'GET_BODY';
 
-plan tests => 10;
+plan tests => 11;
 
 Apache::TestRequest::module('default');
 
@@ -72,6 +72,15 @@ ok $session=~s/^CGI_SESSION=// && t_cmp( $session, qr!^/-S::.+!m ),
 ok t_cmp( GET_BODY( "$session/TestSession__1session_generation?CGI_SESSION" ),
 	  qr/^CGI_SESSION=$session/m ),
    "empty ClickPathMachine directive at work 2";
+
+Apache::TestRequest::module('Without_UAExc');
+
+$config   = Apache::Test::config();
+$hostport = Apache::TestRequest::hostport($config) || '';
+t_debug("connecting to $hostport");
+
+ok t_cmp( GET_BODY( "/TestSession__1session_generation?SESSION" ),
+	  qr/^SESSION=.+/m,  ), "SESSION exists";
 
 # Local Variables: #
 # mode: cperl #

@@ -13,3 +13,8 @@ Revision history for Perl extension Apache::ClickPath.
 	- ClickPathFriendlySessions directive
 	- ClickPathUAExceptionsFile directive
 	- ClickPathFriendlySessionsFile directive
+
+1.1a  Thu Jan 13 17:08:19 CET 2005
+	* Torsten Foertsch <torsten.foertsch@gmx.net>
+	- Bugfix: the handler crashed without a <ClickPathUAExceptions>
+	  section
