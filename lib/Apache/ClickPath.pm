@@ -22,7 +22,7 @@ use Apache::Const -compile => qw(DECLINED OK
 use Time::HiRes ();
 use MIME::Base64 ();
 
-our $VERSION = '1.1c';
+our $VERSION = '1.1d';
 our $rcounter=int rand 0x10000;
 
 my @directives=
@@ -276,6 +276,14 @@ sub handler {
 
   my $file=$r->uri;
 
+  # if an old session is used this will be reset
+  # if an old session timed out (goto NEWSESSION) this will be incremented
+  # giving in 2.
+  # if simply a new session is created this is 1
+  # then a pnote is set indicating this state. Thus the filter can
+  # examin it.
+  my $newsession=1;
+
   my $pr=$r->prev;
   my $ref=$r->headers_in->{Referer} || "";
 
@@ -293,8 +301,9 @@ sub handler {
       $r->subprocess_env( SESSION_AGE=>
 			  $pr->subprocess_env( 'SESSION_AGE' ) );
       $r->subprocess_env( SESSION=>$session );
-      $r->pnotes( __PACKAGE__.'::newsession'=>1 )
-	if( $r->pnotes( __PACKAGE__.'::newsession' ) );
+      $newsession=$pr->pnotes( __PACKAGE__.'::newsession' );
+      $r->pnotes( __PACKAGE__.'::newsession'=>$newsession )
+	if( $newsession );
       #print STDERR "$$: ReUsing session $session\n";
     }
   } elsif( $file=~s!^/+\Q$tag\E ( [^/]+ ) /!/!x ) {
@@ -337,11 +346,13 @@ sub handler {
       $r->subprocess_env->unset( 'CGI_SESSION' );
       $r->subprocess_env->unset( 'REMOTE_SESSION' );
       $r->subprocess_env->unset( 'REMOTE_SESSION_HOST' );
+      $newsession++;
       goto NEWSESSION;
     } else {
       $r->subprocess_env( SESSION_START=>$l[0] );
       $r->subprocess_env( SESSION_AGE=>$r->request_time-$l[0] );
     }
+    $newsession=0;
   } else {
     $ref=~s!^(\w+://[^/]+)/\Q$tag\E[^/]+!$1!;
     $r->headers_in->{Referer}=$ref;
@@ -428,7 +439,7 @@ sub handler {
       $r->subprocess_env( SESSION_START=>$r->request_time );
       $r->subprocess_env( SESSION_AGE=>0 );
       $r->subprocess_env( CGI_SESSION=>'/'.$tag.$session );
-      $r->pnotes( __PACKAGE__.'::newsession'=>1 );
+      $r->pnotes( __PACKAGE__.'::newsession'=>$newsession );
       #print STDERR "$$: Using new session $session\n";
     }
   }
@@ -462,12 +473,19 @@ sub OutputFilter {
 
     $host=$r->headers_in->{Host};
 
-    if( $r->pnotes( __PACKAGE__.'::newsession' ) ) {
+    my $newsession=$r->pnotes( __PACKAGE__.'::newsession' );
+    if( $newsession ) {
       $the_request=$r->the_request;
       $the_request=~s/^\s*\w+\s+//;
       $the_request=~s![^/]*[\s?].*$!!;
+      #print STDERR "the_request=$the_request\n";
+      if( $newsession==2 ) {
+	# cut off an timed out old session if given
+	$the_request=~s!^/+\Q$sprefix\E[^/]+!!;
+	#print STDERR "the_request(2)=$the_request\n";
+      }
 
-      my $re=qr,^(https?://\Q$host\E)?(?!\w+://)(.),i;
+      my $re=qr,^(https?://\Q$host\E)?(?!\w+:)(.),i;
       $r->headers_out->{Location}=~s!$re!$2 eq '/'
                                          ? $1.$sess.$2
                                          : $1.$sess.$the_request.$2
@@ -479,7 +497,7 @@ sub OutputFilter {
                                             !e
 	if( exists $r->err_headers_out->{Location} );
 
-      $re=qr,^(\s*\d+\s*;\s*url\s*=\s*(?:https?://\Q$host\E)?)(?!\w+://)(.),i;
+      $re=qr,^(\s*\d+\s*;\s*url\s*=\s*(?:https?://\Q$host\E)?)(?!\w+:)(.),i;
       $r->headers_out->{Refresh}=~s!$re!$2 eq '/'
                                         ? $1.$sess.$2
                                         : $1.$sess.$the_request.$2
@@ -703,7 +721,6 @@ sub OutputFilter {
 
   # now, filter the content
   while( $f->read(my $buffer, 1024) ) {
-
     # prepend any tags leftover from the last buffer or invocation
     $buffer = $context->{extra} . $buffer if( length $context->{extra} );
 

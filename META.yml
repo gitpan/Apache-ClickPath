@@ -1,7 +1,7 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Apache-ClickPath
-version:      1.1c
+version:      1.1d
 version_from: lib/Apache/ClickPath.pm
 installdirs:  site
 requires:

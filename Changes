@@ -27,3 +27,8 @@ Revision history for Perl extension Apache::ClickPath.
 1.1c  Thu Jan 27 21:45:44 CET 2005
 	* Torsten Foertsch <torsten.foertsch@gmx.net>
 	- Bugfix: now anchor links <a href="#top"> also work
+
+1.1d  Tue Mar 29 22:33:46 CEST 2005
+	* Torsten Foertsch <torsten.foertsch@gmx.net>
+	- Bugfix: the combination of internal redirect and expired sessions
+	  did not work well.
