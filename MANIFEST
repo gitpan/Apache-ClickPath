@@ -15,5 +15,10 @@ t/session/4auto_index.t
 t/session/5internal_redirect.t
 t/session/6nosession.t
 t/session/7uaexceptionfile.t
+t/session/8friendlysession.t
+t/session/9decode.t
 lib/Apache/ClickPath.pm
+lib/Apache/ClickPath/_parse.pm
+lib/Apache/ClickPath/Decode.pm
+decode-session.pl
 META.yml                                 Module meta-data (added by MakeMaker)

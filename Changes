@@ -32,3 +32,10 @@ Revision history for Perl extension Apache::ClickPath.
 	* Torsten Foertsch <torsten.foertsch@gmx.net>
 	- Bugfix: the combination of internal redirect and expired sessions
 	  did not work well.
+
+1.2   Fri Apr  1 22:08:54 CEST 2005
+	* Torsten Foertsch <torsten.foertsch@gmx.net>
+	- Bugfix: <meta HTTP-EQUIV=REFRESH> without quotes surrounding
+	  "REFRESH" did not work
+	- Apache::ClickPath::_parse and Apache::ClickPath::Decode added
+	- decode_session.pl added

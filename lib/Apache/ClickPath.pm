@@ -22,7 +22,9 @@ use Apache::Const -compile => qw(DECLINED OK
 use Time::HiRes ();
 use MIME::Base64 ();
 
-our $VERSION = '1.1d';
+use Apache::ClickPath::_parse ();
+
+our $VERSION = '1.2';
 our $rcounter=int rand 0x10000;
 
 my @directives=
@@ -118,22 +120,11 @@ sub ClickPathUAExceptionsFile {
   $I->{"ClickPathUAExceptionsFile"}=$arg;
 }
 
-sub _parse_UAExceptions {
-  my $conf=shift;
-  my $a=[];
-  foreach my $line (split /\r?\n/, $conf) {
-    if( $line=~/^\s*(\w+):?\s+(.+?)\s*$/ ) {
-      push @{$a}, [$1, qr/$2/];
-    }
-  }
-  return $a;
-}
-
 sub ClickPathUAExceptions {
   my($I, $parms, @args)=@_;
 
   $I->{"ClickPathUAExceptions"}
-    =_parse_UAExceptions( $parms->directive->as_string );
+    =Apache::ClickPath::_parse::UAExceptions( $parms->directive->as_string );
 }
 
 sub ClickPathUAExceptionsEND {
@@ -146,46 +137,12 @@ sub ClickPathFriendlySessionsFile {
   $I->{"ClickPathFriendlySessionsFile"}=$arg;
 }
 
-sub _parse_FriendlySessions {
-  my $conf=shift;
-  my $t={};
-  my $r={};
-
-  foreach my $l (split /\r?\n/, $conf) {
-
-    next unless( $l=~/^\s*(\S+)\s+	# $1: friendly REMOTE_HOST
-                      (			# $2: list of "uri( number )" or
-                       (?:		#     "param( name )" statements
-		        (?:uri|param)\s*
-		        \(
-		          \s*\w+\s*
-                        \)\s*
-                       )+
-                      )
-                      (?:\s*(\w+))?	# $3: opt. name, default=REMOTE_HOST
-                     /x );
-
-    my ($rem_host, $stmt_list, $name)=($1, $2, $3);
-    $name=$rem_host unless( defined $name );
-
-    my @stmts;
-    while( $stmt_list=~/(uri|param)\s*\(\s*(\w+)\s*\)/g ) {
-      push @stmts, [$1, $2];
-    }
-
-    $t->{$rem_host}=[[@stmts], $name];
-    $r->{$name}=$rem_host;
-  }
-
-  return $t, $r;
-}
-
 sub ClickPathFriendlySessions {
   my($I, $parms, @args)=@_;
 
   @{$I}{"ClickPathFriendlySessionsTable",
 	"ClickPathFriendlySessionsReverse"}
-    =_parse_FriendlySessions( $parms->directive->as_string );
+    =Apache::ClickPath::_parse::FriendlySessions( $parms->directive->as_string );
 }
 
 sub ClickPathFriendlySessionsEND {
@@ -218,7 +175,7 @@ sub _get_ua_exc {
 
     local $/;
     $cf->{"ClickPathUAExceptions_list"}
-      =_parse_UAExceptions( scalar( <$fh> ) );
+      =Apache::ClickPath::_parse::UAExceptions( scalar( <$fh> ) );
     close $fh;
     return $cf->{"ClickPathUAExceptions_list"};
   } elsif( @stat and
@@ -248,7 +205,7 @@ sub _get_friendly_session {
     local $/;
     @{$cf}{"ClickPathFriendlySessionsFileTable",
 	   "ClickPathFriendlySessionsFileReverse"}
-      =_parse_FriendlySessions( scalar( <$fh> ) );
+      =Apache::ClickPath::_parse::FriendlySessions( scalar( <$fh> ) );
     close $fh;
     return @{$cf}{"ClickPathFriendlySessionsFileTable",
 		  "ClickPathFriendlySessionsFileReverse"};
@@ -557,7 +514,7 @@ sub OutputFilter {
 	      )			# $1 ende
 
 	      (			# $2 start         optional "http-equiv=..."
-	       \bhttp-equiv\s*=\s*(["'])refresh\3
+	       \bhttp-equiv\s*=\s*(["']?)refresh\3
 	       [^>]*?		# evtl. anderes Zeug
 	      )?		# $2 ende
 
@@ -578,7 +535,7 @@ sub OutputFilter {
 
 	      (			# $7 start         optional "http-equiv=..."
 	       [^>]*?		# evtl. anderes Zeug
-	       \bhttp-equiv\s*=\s*(["'])refresh\8
+	       \bhttp-equiv\s*=\s*(["']?)refresh\8
 	      )?		# $7 ende
 	     ,ix;
 
@@ -635,7 +592,7 @@ sub OutputFilter {
 	      )			# $1 ende
 
 	      (			# $2 start         optional "http-equiv=..."
-	       \bhttp-equiv\s*=\s*(["'])refresh\3
+	       \bhttp-equiv\s*=\s*(["']?)refresh\3
 	       [^>]*?		# evtl. anderes Zeug
 	      )?		# $2 ende
 
@@ -656,7 +613,7 @@ sub OutputFilter {
 
 	      (			# $7 start         optional "http-equiv=..."
 	       [^>]*?		# evtl. anderes Zeug
-	       \bhttp-equiv\s*=\s*(["'])refresh\8
+	       \bhttp-equiv\s*=\s*(["']?)refresh\8
 	      )?		# $7 ende
 	     ,ix;
 
@@ -1100,8 +1057,14 @@ chain with C<PerlOutputFilterHandler> and C<PerlSetOutputFilter>:
 
 Don't hesitate to contact me if you are interested in this little module.
 
+=head2 Debugging
+
+Sometimes it is useful to know the information encoded in a session
+identifier. This is why L<Apache::ClickPath::Decode> exists.
+
 =head1 SEE ALSO
 
+L<Apache::ClickPath::Decode(3)>
 L<http://perl.apache.org>,
 L<http://httpd.apache.org>
 

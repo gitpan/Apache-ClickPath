@@ -5,7 +5,7 @@ use Test::More;
 use Apache::TestUtil;
 use Apache::TestRequest 'GET_BODY';
 
-plan tests => 46;
+plan tests => 48;
 
 Apache::TestRequest::module('default');
 
@@ -52,6 +52,29 @@ open F, ">t/htdocs/tmp/x.html" and print F <<"EOF";
     <iframe src="../index1.html">3</iframe>
     <iframe src="http://x.y/index1.html">4</iframe>
   </body>
+</html>
+EOF
+close F;
+
+open F, ">t/htdocs/tmp/y.html" and print F <<"EOF";
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+	<head>
+		<meta http-equiv="content-type" content="text/html;charset=ISO-8859-1">
+		<meta HTTP-EQUIV=REFRESH CONTENT="0; URL=/klaus/view/index.shtml">
+	</head>
+
+	<body>
+		<center>
+			<div class="box">
+				<span class="headline">Weiterleitung&nbsp;|&nbsp;</span>eine&nbsp;Moment&nbsp;bitte
+			</div>
+			<p>Sie werden automatisch auf die gew&uuml;nschte Seite weitergeleitet.<p>
+			<p><a href="/klaus/view/index.shtml">Falls Ihr Browser keine Weiterleitung unterst&uuml;tzt, klicken Sie bitte hier.</a></p>
+		</center>
+	</body>
+
 </html>
 EOF
 close F;
@@ -162,6 +185,12 @@ ok( t_cmp( $got, qr!<iframe src="\.\./index1\.html">3</iframe>! ),
     "iframe 3" );
 ok( t_cmp( $got, qr!<iframe src="http://x.y/index1.html">4</iframe>! ),
     "iframe 4" );
+
+$got=GET_BODY( "$session/tmp/y.html", redirect_ok=>0 );
+ok( t_cmp( $got, qr!<meta HTTP-EQUIV=REFRESH CONTENT="0; URL=\Q$session\E/klaus/view/index\.shtml">! ),
+    "y.html - <meta>" );
+ok( t_cmp( $got, qr!<a href="\Q$session\E/klaus/view/index\.shtml">! ),
+    "y.html - <a>" );
 
 # Local Variables: #
 # mode: cperl #

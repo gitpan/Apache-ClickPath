@@ -284,8 +284,13 @@ DESCRIPTION
     Don't hesitate to contact me if you are interested in this little
     module.
 
+  Debugging
+    Sometimes it is useful to know the information encoded in a session
+    identifier. This is why Apache::ClickPath::Decode exists.
+
 SEE ALSO
-    <http://perl.apache.org>, <http://httpd.apache.org>
+    Apache::ClickPath::Decode(3) <http://perl.apache.org>,
+    <http://httpd.apache.org>
 
 AUTHOR
     Torsten Foertsch, <torsten.foertsch@gmx.net>
