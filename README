@@ -1,0 +1,215 @@
+NAME
+    Apache::ClickPath - Apache WEB Server User Tracking
+
+SYNOPSIS
+     LoadModule perl_module ".../mod_perl.so"
+     PerlLoadModule Apache::ClickPath
+     <ClickPathUAExceptions>
+       Google     Googlebot
+       MSN        msnbot
+       Mirago     HeinrichderMiragoRobot
+       Yahoo      Yahoo-MMCrawler
+       Seekbot    Seekbot
+       Picsearch  psbot
+       Globalspec Ocelli
+       Naver      NaverBot
+       Turnitin   TurnitinBot
+       dir.com    Pompos
+       search.ch  search\.ch
+       IBM        http://www\.almaden\.ibm\.com/cs/crawler/
+     </ClickPathUAExceptions>
+     ClickPathSessionPrefix "-S:"
+     ClickPathMaxSessionAge 18000
+     PerlTransHandler Apache::ClickPath
+     PerlOutputFilterHandler Apache::ClickPath::OutputFilter
+     LogFormat "%h %l %u %t \"%m %U%q %H\" %>s %b \"%{Referer}i\" \"%{User-agent}i\" \"%{SESSION}e\""
+
+ABSTRACT
+    "Apache::ClickPath" can be used to track user activity on your web
+    server and gather click streams. Unlike mod_usertrack it does not use a
+    cookie. Instead the session identifier is transferred as the first part
+    on an URI.
+
+    Furthermore, in conjunction with a load balancer it can be used to
+    direct all requests belonging to a session to the same server.
+
+DESCRIPTION
+    "Apache::ClickPath" adds a PerlTransHandler and an output filter to
+    Apache's request cycle. The transhandler inspects the requested URI to
+    decide if an existing session is used or a new one has to be created.
+
+  The Translation Handler
+    If the requested URI starts with a slash followed by the session prefix
+    (see "ClickPathSessionPrefix" below) the rest of the URI up to the next
+    slash is treated as session identifier. If for example the requested URI
+    is "/-S:s9NNNd:doBAYNNNiaNQOtNNNNNM/index.html" then assuming
+    "ClickPathSessionPrefix" is set to "-S:" the session identifier would be
+    "s9NNNd:doBAYNNNiaNQOtNNNNNM".
+
+    If no session identifier is found a new one is created.
+
+    Then the session prefix and identifier are stripped from the current
+    URI. Also a potentially existing session is stripped from the incoming
+    "Referer" header.
+
+    There are several exceptions to this scheme. Even if the incoming URI
+    contains a session a new one is created if it is too old. This is done
+    to prevent link collections, bookmarks or search engines generating
+    endless click streams.
+
+    If the incoming "UserAgent" header matches a configurable regular
+    expression neither session identifier is generated nor output filtering
+    is done. That way search engine crawlers will not create sessions and
+    links to your site remain readable (without the session stuff).
+
+    The translation handler sets the following environment variables that
+    can be used in CGI programms or template systems (eg. SSI):
+
+    SESSION
+        the session identifier itself. In the example above
+        "s9NNNd:doBAYNNNiaNQOtNNNNNM" is assigned. If the "UserAgent"
+        prevents session generation the name of the matching regular
+        expression is assigned, (see "ClickPathUAExceptions").
+
+    CGI_SESSION
+        the session prefix + the session identifier. In the example above
+        "/-S:s9NNNd:doBAYNNNiaNQOtNNNNNM" is assigned. If the "UserAgent"
+        prevents session generation "CGI_SESSION" is empty.
+
+    SESSION_START
+        the request time of the request starting a session in seconds since
+        1/1/1970.
+
+    CGI_SESSION_AGE
+        the session age in seconds, i.e. CURRENT_TIME - SESSION_START.
+
+  The Output Filter
+    The output filter is entirely skipped if the translation handler had not
+    set the "CGI_SESSION" environment variable.
+
+    It prepends the session prefix and identifier to any "Location" an
+    "Refresh" output headers.
+
+    If the output "Content-Type" is "text/html" the body part is modified.
+    In this case the filter patches the following HTML tags:
+
+    <a ... href="LINK" ...>
+    <form ... action="LINK" ...>
+    <meta ... http-equiv="refresh" ... content="N; URL=LINK" ...>
+        In all cases if "LINK" starts with a slash the current value of
+        "CGI_SESSION" is prepended. If "LINK" starts with "http://HOST/" (or
+        https:) where "HOST" matches the incoming "Host" header
+        "CGI_SESSION" is inserted right after "HOST". If "LINK" is relative
+        and the incoming request URI had contained a session then "LINK" is
+        left unmodified. Otherwize it is converted to a link starting with a
+        slash and "CGI_SESSION" is prepended.
+
+  Configuration Directives
+    All directives are valid only in *server config* or *virtual host*
+    contexts.
+
+    ClickPathSessionPrefix
+        specifies the session prefix without the leading slash.
+
+    ClickPathMaxSessionAge
+        if a session gets older than this value (in seconds) a new one is
+        created instead of continuing the old. Values of about a few hours
+        should be good, eg. 18000 = 5 h.
+
+    ClickPathUAExceptions
+        this is a container directive like "<Location>" or "<Directory>".
+        The container content lines consist of a name and a regular
+        expression. For example
+
+         1   <ClickPathUAExceptions>
+         2     Google     Googlebot
+         3     MSN        (?i:msnbot)
+         4   </ClickPathUAExceptions>
+
+        Line 2 maps each "UserAgent" containing the word "Googlebot" to the
+        name "Google". Now if a request comes in with an "UserAgent" header
+        containing "Googlebot" no session is generated. Instead the
+        environment variable "SESSION" is set to "Google" and "CGI_SESSION"
+        is emtpy.
+
+  Working with a load balancer
+    To generate a session identifier almost the same information is used as
+    "mod_uniqueid" does only the order differs. A session identifier always
+    starts with 6 characters followed by a colon. These 6 characters are the
+    machine's encoded IP address. The colon is syntactic sugar. It is needed
+    for some load balancers.
+
+    Most load balancers are able to map a request to a particular machine
+    based on a part of the request URI. They look for a prefix followed by a
+    given number of characters or until a suffix is found. The string
+    between identifies the machine to route the request to.
+
+    So with "Apache::ClickPath"'s session meet these requirements. The
+    prefix is the "ClickPathSessionPrefix" the suffix is a single colon.
+
+  Logging
+    The most important part of user tracking and clickstreams is logging.
+    With "Apache::ClickPath" many request URIs contain an initial session
+    part. Thus, for logfile analyzers most requests are unique which leads
+    to useless results. Normally Apache's common logfile format starts with
+
+     %h %l %u %t \"%r\"
+
+    %r stands for *the request*. It is the first line a browser sends to a
+    server. For use with "Apache::ClickPath" %r is better changed to "%m
+    %U%q %H". Since "Apache::ClickPath" strips the session part from the
+    current URI %U appears without the session. With this modification
+    logfile analyzers will produce meaningful results again.
+
+    The session can be logged as "%{SESSION}e" at end of a logfile line.
+
+  A word about proxies
+    Depending on your content and your users community HTTP proxies can
+    serve a significant part of your traffic. With "Apache::ClickPath"
+    almost all request have to be served by your server.
+
+  Using with SSI
+    Server Side Includes are also implemented as an output filter. Normally
+    Perl output filters are called *before* mod_include leading to
+    unexpected results if an SSI statement generated links. On the other
+    hand one can configure the "INCLUDES" filter with "PerlSetOutputFilter"
+    which preserves the order given in the configuration file. Unfortunately
+    there is no "PerlSetOutputFilterByType" directive and and the "INCLUDES"
+    filter processes everything independend of the "Content-Type". Thus,
+    also images and other stuff is scanned for SSI statements.
+
+    With Apache 2.2 there will be a filter dispatcher module that can maybe
+    address this problem.
+
+    Currently my only solution to this problem is a little module
+    "Apache::RemoveNextFilterIfNotTextHtml" and setting up the filter chain
+    with "PerlOutputFilterHandler" and "PerlSetOutputFilter":
+
+     PerlOutputFilterHandler Apache::RemoveNextFilterIfNotTextHtml
+     PerlSetOutputFilter INCLUDES
+     PerlOutputFilterHandler Apache::ClickPath::OutputFilter
+
+    Don't hesitate to contact me if you are interested in this little
+    module.
+
+SEE ALSO
+    <http://perl.apache.org>, <http://httpd.apache.org>
+
+AUTHOR
+    Torsten Foertsch, <torsten.foertsch@gmx.net>
+
+COPYRIGHT AND LICENSE
+    Copyright (C) 2004 by Torsten Foertsch
+
+    This library is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself.
+
+INSTALLATION
+     perl Makefile.PL
+     make
+     make test
+     make install
+
+DEPENDENCIES
+    mod_perl 1.9918 (aka 2.0.0-RC1), perl 5.8.0
+
